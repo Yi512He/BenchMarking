@@ -37,6 +37,7 @@ int server(int argc, char* argv[]) {
 
     // Allocate buffer
     buffer = (char *)malloc(size);
+    printf("INFO: Created buffer of size %d bytes\n", size);
 
 	// Create socket
 	servsockfd = socket(AF_INET, SOCK_STREAM, 0); 
@@ -81,33 +82,37 @@ int server(int argc, char* argv[]) {
     
     // Set flags
     on = 1;
-    if(!setsockopt(connsockfd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on))) {
+    if(setsockopt(connsockfd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on))) {
 		perror("ERROR: Failed to set TCP_NODELAY\n"); 
 		return 1;
     }
 
     for (i=0; i<n; i++) {
-        printf("INFO: On iteration %d\n", i);
+#ifdef DEBUG
+        printf("INFO: On iteration %d out of %d\n", i, n);
+#else
+        if (i*10/(n+1) < (i+1)*10/(n+1)) {
+            printf("INFO: On iteration %d out of %d\n", i, n);
+        }
+#endif
 
         // Receive data
         total_size = 0;
-        one_size = recv(connsockfd, buffer + total_size, size, 0);
-        while (one_size > 0 && total_size < size) {
+        do {
+            one_size = recv(connsockfd, buffer + total_size, size - total_size, 0);
             total_size += one_size;
-            one_size = recv(connsockfd, buffer + total_size, size, 0);
-        }
+        } while (one_size > 0 && total_size < size);
         if (total_size != size) {
-            perror("ERROR: Failed to send all data\n"); 
+            perror("ERROR: Failed to receive all data\n"); 
             return 1;
         }
 
         // Send data back
         total_size = 0;
-        one_size = send(connsockfd, buffer + total_size, size, 0);
-        while (one_size > 0 && total_size < size) {
+        do {
+            one_size = send(connsockfd, buffer + total_size, size - total_size, 0);
             total_size += one_size;
-            one_size = send(connsockfd, buffer + total_size, size, 0);
-        }
+        } while (one_size > 0 && total_size < size);
         if (total_size != size) {
             perror("ERROR: Failed to send all data\n"); 
             return 1;
@@ -128,7 +133,7 @@ int client(int argc, char* argv[]) {
 	int size, n, port, quickack, sockfd, on, i, one_size, total_size; 
 	struct sockaddr_in servaddr; 
     struct timespec s, t;
-    unsigned long min_time, tmp_time;
+    unsigned long long high, low, rs, rt, min_time, tmp_time;
 
     // Argument parsing (no error handling)
     // Client arguments: <size> <n> <hostname> <port> [--quickack]
@@ -147,6 +152,7 @@ int client(int argc, char* argv[]) {
 
     // Allocate buffer
     buffer = (char *)malloc(size);
+    printf("INFO: Created buffer of size %d bytes\n", size);
 
 	// Create socket
 	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
@@ -173,24 +179,33 @@ int client(int argc, char* argv[]) {
 
     // Set flags
     on = 1;
-    if(!setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on))) {
+    if(setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on))) {
 		perror("ERROR: Failed to set TCP_NODELAY\n"); 
 		return 1;
     }
 
     min_time = 999999999;
     for (i=0; i<n; i++) {
-        printf("INFO: On iteration %d\n", i);
+#ifdef DEBUG
+        printf("INFO: On iteration %d out of %d\n", i, n);
+#else
+        if (i*10/(n+1) < (i+1)*10/(n+1)) {
+            printf("INFO: On iteration %d out of %d\n", i, n);
+        }
+#endif
 
+#ifndef RDTSC
         clock_gettime(CLOCK_REALTIME, &s);
-
+#else
+	    asm volatile ("RDTSC" : "=r" (high), "=r" (low));
+        rs = high << 32 | low;
+#endif
         // Send data
         total_size = 0;
-        one_size = send(sockfd, buffer + total_size, size, 0);
-        while (one_size > 0 && total_size < size) {
+        do {
+            one_size = send(sockfd, buffer + total_size, size - total_size, 0);
             total_size += one_size;
-            one_size = send(sockfd, buffer + total_size, size, 0);
-        }
+        } while (one_size > 0 && total_size < size);
         if (total_size != size) {
             perror("ERROR: Failed to send all data\n"); 
             return 1;
@@ -198,19 +213,23 @@ int client(int argc, char* argv[]) {
 
         // Receive echo
         total_size = 0;
-        one_size = recv(sockfd, buffer + total_size, size, 0);
-        while (one_size > 0 && total_size < size) {
+        do {
+            one_size = recv(sockfd, buffer + total_size, size - total_size, 0);
             total_size += one_size;
-            one_size = recv(sockfd, buffer + total_size, size, 0);
-        }
+        } while (one_size > 0 && total_size < size);
         if (total_size != size) {
             perror("ERROR: Failed to receive all data\n"); 
             return 1;
         }
 
+#ifndef RDTSC
         clock_gettime(CLOCK_REALTIME, &t);
-        
         tmp_time = t.tv_nsec - s.tv_nsec;
+#else
+        asm volatile ("RDTSC" : "=r" (high), "=r" (low));
+        rt = high << 32 | low;
+        tmp_time = rt - rs;
+#endif
         if (tmp_time < min_time) {
             min_time = tmp_time;
         }
@@ -218,13 +237,13 @@ int client(int argc, char* argv[]) {
 	// Close sockets
 	close(sockfd); 
 
-    printf("%ld\n", min_time);
+    printf("%.2lf\n", min_time / 2.0);
     return 0;
 }
 
 int main(int argc, char* argv[]) {
     // Argument parsing
-    // Arguments: <process> -(s <server_arguments>|c <client_arguments>)
+    // Arguments: <command> -(s <server_arguments>|c <client_arguments>)
     if (argc > 1) {
         if (!strcmp(argv[1], "-s")) {
             return server(argc-2, argv+2);
@@ -233,5 +252,8 @@ int main(int argc, char* argv[]) {
         }
     }
     perror("ERROR: Invalid arguments\n");
+    printf("Arguments: <command> -(s <server_arguments>|c <client_arguments>)\n" \
+           "Server arguments: <size> <n> <port> [--quickack]\n" \
+           "Client arguments: <size> <n> <hostname> <port> [--quickack]\n");
     return 1;
 }
