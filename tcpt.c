@@ -1,3 +1,8 @@
+/** 
+ * TCP throughput measurement
+ * Author: Tao Ji
+ */
+
 #include <netdb.h> 
 #include <netinet/in.h> 
 #include <netinet/tcp.h>
@@ -13,12 +18,14 @@
 #include <time.h>
 
 #define MULTIPLE 1024
+#define RET_SZ 4
+#define BATCH_SZ 100
 
 int server(int argc, char* argv[]) {
 
     char *buffer;
     char mul;
-	int size, n, port, quickack, servsockfd, connsockfd, addrlen, on, i, one_size, total_size; 
+	int size, n, port, quickack, servsockfd, connsockfd, addrlen, on, i, j, one_size, total_size; 
 	struct sockaddr_in servaddr, cliaddr; 
 
     // Argument parsing (no error handling)
@@ -27,7 +34,10 @@ int server(int argc, char* argv[]) {
     if (mul == 'k') {
         size *= MULTIPLE;
     }
-    n = atoi(argv[1]);
+    n = atoi(argv[1]) / BATCH_SZ;
+    if (!n) {
+        n = 1;
+    }
     port = atoi(argv[2]);
     if (argc == 4 && !strcmp(argv[3], "--quickack")) {
         quickack = 1;
@@ -88,33 +98,26 @@ int server(int argc, char* argv[]) {
     }
 
     for (i=0; i<n; i++) {
-#ifdef DEBUG
-        printf("INFO: On iteration %d out of %d\n", i, n);
-#else
         if (i*10/(n+1) < (i+1)*10/(n+1)) {
-            printf("INFO: On iteration %d out of %d\n", i, n);
-        }
-#endif
-
-        // Receive data
-        total_size = 0;
-        do {
-            one_size = recv(connsockfd, buffer + total_size, size - total_size, 0);
-            total_size += one_size;
-        } while (one_size > 0 && total_size < size);
-        if (total_size != size) {
-            perror("ERROR: Failed to receive all data\n"); 
-            return 1;
+            printf("INFO: On batch %d out of %d\n", i, n);
         }
 
-        // Send data back
-        total_size = 0;
-        do {
-            one_size = send(connsockfd, buffer + total_size, size - total_size, 0);
-            total_size += one_size;
-        } while (one_size > 0 && total_size < size);
-        if (total_size != size) {
-            perror("ERROR: Failed to send all data\n"); 
+        for (j = 0; j < BATCH_SZ; j++) {
+            // Receive data
+            total_size = 0;
+            do {
+                one_size = recv(connsockfd, buffer + total_size, size - total_size, 0);
+                total_size += one_size;
+            } while (one_size > 0 && total_size < size);
+            if (total_size != size) {
+                perror("ERROR: Failed to receive all data\n"); 
+                return 1;
+            }
+        }
+
+        // Send return 
+        if (send(connsockfd, "END", RET_SZ, 0) < 0) {
+            perror("ERROR: Failed to send return\n"); 
             return 1;
         }
     }
@@ -130,7 +133,7 @@ int client(int argc, char* argv[]) {
 
     char *hostname, *buffer;
     char mul;
-	int size, n, port, quickack, sockfd, on, i, one_size, total_size; 
+	int size, n, port, quickack, sockfd, on, i, j, one_size, total_size; 
 	struct sockaddr_in servaddr; 
     struct timespec s, t;
     unsigned long long high, low, rs, rt, min_time, tmp_time;
@@ -141,7 +144,10 @@ int client(int argc, char* argv[]) {
     if (mul == 'k') {
         size *= MULTIPLE;
     }
-    n = atoi(argv[1]);
+    n = atoi(argv[1]) / BATCH_SZ;
+    if (!n) {
+        n = 1;
+    }
     hostname = argv[2];
     port = atoi(argv[3]);
     if (argc == 5 && !strcmp(argv[4], "--quickack")) {
@@ -186,13 +192,9 @@ int client(int argc, char* argv[]) {
 
     min_time = 999999999;
     for (i=0; i<n; i++) {
-#ifdef DEBUG
-        printf("INFO: On iteration %d out of %d\n", i, n);
-#else
         if (i*10/(n+1) < (i+1)*10/(n+1)) {
-            printf("INFO: On iteration %d out of %d\n", i, n);
+            printf("INFO: On batch %d out of %d\n", i, n);
         }
-#endif
 
 #ifndef RDTSC
         clock_gettime(CLOCK_REALTIME, &s);
@@ -200,25 +202,24 @@ int client(int argc, char* argv[]) {
 	    asm volatile ("RDTSC" : "=r" (high), "=r" (low));
         rs = high << 32 | low;
 #endif
-        // Send data
-        total_size = 0;
-        do {
-            one_size = send(sockfd, buffer + total_size, size - total_size, 0);
-            total_size += one_size;
-        } while (one_size > 0 && total_size < size);
-        if (total_size != size) {
-            perror("ERROR: Failed to send all data\n"); 
-            return 1;
+
+        for (j=0; j<BATCH_SZ; j++) {
+            // Send data
+            total_size = 0;
+            do {
+                one_size = send(sockfd, buffer + total_size, size - total_size, 0);
+                total_size += one_size;
+            } while (one_size > 0 && total_size < size);
+            if (total_size != size) {
+                perror("ERROR: Failed to send all data\n"); 
+                return 1;
+            }
+
         }
 
-        // Receive echo
-        total_size = 0;
-        do {
-            one_size = recv(sockfd, buffer + total_size, size - total_size, 0);
-            total_size += one_size;
-        } while (one_size > 0 && total_size < size);
-        if (total_size != size) {
-            perror("ERROR: Failed to receive all data\n"); 
+        // Receive a return
+        if (recv(sockfd, buffer, RET_SZ, 0) < 0) {
+            perror("ERROR: Failed to receive return\n"); 
             return 1;
         }
 
@@ -237,7 +238,7 @@ int client(int argc, char* argv[]) {
 	// Close sockets
 	close(sockfd); 
 
-    printf("%.2lf\n", min_time / 2.0);
+    printf("%.3lf\n", (size * BATCH_SZ + 4) * 1e9 / min_time / 1024.0 / 1024.0 );
     return 0;
 }
 
