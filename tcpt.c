@@ -46,7 +46,7 @@ int server(int argc, char* argv[]) {
     }
 
     // Allocate buffer
-    buffer = (char *)malloc(size);
+    buffer = (char *)malloc(size*sizeof(*buffer));
     printf("INFO: Created buffer of size %d bytes\n", size);
 
 	// Create socket
@@ -157,7 +157,7 @@ int client(int argc, char* argv[]) {
     }
 
     // Allocate buffer
-    buffer = (char *)malloc(size);
+    buffer = (char *)malloc(size*sizeof(*buffer));
     printf("INFO: Created buffer of size %d bytes\n", size);
 
 	// Create socket
@@ -225,7 +225,7 @@ int client(int argc, char* argv[]) {
 
 #ifndef RDTSC
         clock_gettime(CLOCK_REALTIME, &t);
-        tmp_time = t.tv_nsec - s.tv_nsec;
+        tmp_time = (t.tv_sec - s.tv_sec) * 1e9 + t.tv_nsec - s.tv_nsec;
 #else
         asm volatile ("RDTSC" : "=r" (high), "=r" (low));
         rt = high << 32 | low;
