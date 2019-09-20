@@ -1,5 +1,5 @@
 /** 
- * TCP latency measurement
+ * UDP throughput measurement
  * Author: Tao Ji
  */
 

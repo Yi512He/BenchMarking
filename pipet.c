@@ -1,6 +1,6 @@
 /** 
  * Pipe latency measurement
- * Authors: Tao Ji and Emma HE
+ * Authors: Tao Ji and Emma He
  */
 
 #include <netdb.h> 
