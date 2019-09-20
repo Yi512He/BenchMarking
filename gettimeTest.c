@@ -25,7 +25,7 @@ int main() {
 		// printf("time is %ld\n", tmp);
 	}
 
-	printf("the execution time is %ld\n", min);
+	printf("%ld\n", min);
 
 
 }
