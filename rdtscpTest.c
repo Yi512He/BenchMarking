@@ -14,9 +14,9 @@ unsigned long long returnTime(){
 
 	// inline assembly read timestamp twice
 	__asm__ __volatile__ (
-		"RDTSC" : "=r" (cycles_high), "=r" (cycles_low));
+		"RDTSCP" : "=r" (cycles_high), "=r" (cycles_low));
 	__asm__ __volatile__ (	
-		"RDTSC;" : "=r" (cycles_high1), "=r" (cycles_low1));
+		"RDTSCP" : "=r" (cycles_high1), "=r" (cycles_low1));
 
 	start = ( (cycles_high << 32) | cycles_low );
        	end = ( (cycles_high1 << 32) | cycles_low1 );
