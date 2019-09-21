@@ -4,6 +4,6 @@ pipel pipet tcpl tcpt udpl udpt: % : %.c
 	gcc -o $@ $^
 
 clean:
-	rm -f pipel pipet tcpl tcpt udpl udpt
+	rm -f pipel pipet tcpl tcpt udpl udpt *.txt
 
 .PHONY: clean

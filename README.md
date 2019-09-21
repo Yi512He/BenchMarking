@@ -47,7 +47,11 @@ We test the best latency and throughput of the pipe for each *data size* and the
 ./run_pipe.sh
 ```
 
-The result numbers will be stored in `pipe.txt` in the same order as the list of data sizes in the script.
+The result numbers will be stored in `pipe.txt` in the same order as the list of data sizes in the script. To check the result:
+
+```shell
+cat pipe.txt
+```
 
 ## Socket
 This part of the experiment benchmarks TCP latency, TCP throughput and UDP latency. We will talk about UDP throughput later. You should first start two sessions, either on one host (the *local* benchmark) or on two hosts (the *remote* benchmark). The logic for both cases is the same. Run the server side first:
@@ -72,7 +76,7 @@ Then run the client side:
 
 where `host` is the IP address of the server.
 
-The result will be saved to `socket.txt`.
+The result will be saved to `socket.txt`. The format is similar to `pipe.txt`.
 
 If you wish to run stand-alone experiment, run the corresponding command for hints, such as `./tcpt` (for TCP throughput) and `./udpl` (for UDP latency).
 
