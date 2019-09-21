@@ -6,6 +6,7 @@ if [[ -z $1 ]]; then
     echo "Please specify -l for local tests or -r <host> for remote tests"
     exit 1
 elif [[ $1 == "-l" ]]; then
+    # Number of iterations used in each local test w.r.t. data size
     N_ITER=(1000000 1000000 1000000 1000000 1000000 1000000 500000 200000 100000)
     HOST="127.0.0.1"
 elif [[ $1 == "-r" ]]; then
@@ -13,6 +14,7 @@ elif [[ $1 == "-r" ]]; then
         echo "ERROR: Invalid arguments"
         exit 1
     fi
+    # Number of iterations used in each remote test w.r.t. data size
     N_ITER=(100000 100000 100000 100000 100000 100000 50000 20000 10000)
     HOST=$2
 else 
