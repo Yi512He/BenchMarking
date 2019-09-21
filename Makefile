@@ -1,12 +1,9 @@
-all: timing syscall ipc
+all: pipel pipet tcpl tcpt udpl udpt
 
-timing: gettimeTest rdtscTest rdtscpTest
-
-syscall: getpidTest getuidTest
-
-ipc: pipel pipet tcpl tcpt udpl udpt
-
-gettimeTest rdtscTest rdtscpTest getpidTest getuidTest pipel pipet tcpl tcpt udpl udpt: % : %.c
+pipel pipet tcpl tcpt udpl udpt: % : %.c
 	gcc -o $@ $^
 
+clean:
+	rm -f pipel pipet tcpl tcpt udpl udpt
 
+.PHONY: clean
